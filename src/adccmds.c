@@ -3,10 +3,10 @@
 // Copyright (C) 2016  Kevin O'Connor <kevin@koconnor.net>
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
-
 #include "basecmd.h" // oid_alloc
 #include "board/gpio.h" // struct gpio_adc
 #include "board/irq.h" // irq_disable
+#include "board/misc.h" // timer_is_before
 #include "command.h" // DECL_COMMAND
 #include "sched.h" // DECL_TASK
 
@@ -16,6 +16,7 @@ struct analog_in {
     uint16_t value, min_value, max_value;
     struct gpio_adc pin;
     uint8_t state, sample_count;
+    uint32_t last_sample_time;
 };
 
 static struct task_wake analog_wake;
@@ -45,6 +46,16 @@ analog_in_event(struct timer *timer)
     if (a->value < a->min_value || a->value > a->max_value)
         try_shutdown("ADC out of range");
     sched_wake_task(&analog_wake);
+    uint32_t last_sample_time = a->timer.waketime - a->next_begin_time;
+    if (last_sample_time > a->last_sample_time) {
+        output("lst %hu %u", (int)a, last_sample_time);
+        a->last_sample_time = last_sample_time;
+    }
+    if (last_sample_time > a->rest_time) {
+        output("adc time %hu %u %u"
+               , (int)a, a->next_begin_time, a->timer.waketime);
+        shutdown("backwards adc");
+    }
     a->next_begin_time += a->rest_time;
     a->timer.waketime = a->next_begin_time;
     return SF_RESCHEDULE;

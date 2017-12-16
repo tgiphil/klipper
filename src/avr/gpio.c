@@ -289,6 +289,8 @@ gpio_adc_setup(uint8_t pin)
     else
 #endif
         DIDR0 |= 1 << chan;
+    output("adc setup %c: %c %c %c %c %c"
+           , chan, ADCSRA, ADCSRB, ADMUX, DIDR0, DIDR1);
 
     return (struct gpio_adc){ chan };
 }
